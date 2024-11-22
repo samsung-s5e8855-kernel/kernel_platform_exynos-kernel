@@ -77,3 +77,6 @@ type 'struct pkvm_module_ops' changed
 type 'enum ftrace_dump_mode' changed
   enumerator 'DUMP_PARAM' (3) was added
 
+type 'struct cgroup_root' changed
+  member 'u8 android_backport_reserved1[28]' was removed
+  member 'union { struct callback_head rcu; struct { u8 android_backport_reserved1[28]; }; union { }; }' was added

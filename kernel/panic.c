@@ -38,6 +38,8 @@
 #include <trace/events/error_report.h>
 #include <asm/sections.h>
 
+#include <linux/sec_debug_built.h>
+
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
 
@@ -265,6 +267,10 @@ static void panic_other_cpus_shutdown(bool crash_kexec)
 		crash_smp_send_stop();
 }
 
+#if IS_ENABLED(CONFIG_SEC_DEBUG_AUTO_COMMENT)
+extern void dump_stack_auto_comment(void);
+#endif
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -331,13 +337,21 @@ void panic(const char *fmt, ...)
 	if (len && buf[len - 1] == '\n')
 		buf[len - 1] = '\0';
 
-	pr_emerg("Kernel panic - not syncing: %s\n", buf);
+	pr_auto(ASL5, "Kernel panic - not syncing: %s\n", buf);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
 	 */
-	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
+	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1) {
+#if IS_ENABLED(CONFIG_SEC_DEBUG_AUTO_COMMENT)
+		if (strnstr(buf, "panic_on_warn", sizeof(buf)))
+			dump_stack_auto_comment();
+		else
+			dump_stack();
+#else
 		dump_stack();
+#endif
+	}
 #endif
 
 	/*
@@ -663,11 +677,13 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	disable_trace_on_warning();
 
 	if (file)
-		pr_warn("WARNING: CPU: %d PID: %d at %s:%d %pS\n",
+		pr_auto_on(panic_on_warn, ASL1,
+			"WARNING: CPU: %d PID: %d at %s:%d %pS\n",
 			raw_smp_processor_id(), current->pid, file, line,
 			caller);
 	else
-		pr_warn("WARNING: CPU: %d PID: %d at %pS\n",
+		pr_auto_on(panic_on_warn, ASL1,
+			"WARNING: CPU: %d PID: %d at %pS\n",
 			raw_smp_processor_id(), current->pid, caller);
 
 	if (args)
@@ -675,8 +691,17 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 
 	print_modules();
 
+#if IS_ENABLED(CONFIG_SEC_DEBUG_AUTO_COMMENT)
+	if (regs) {
+		bool auto_comm = panic_on_warn &&
+				 !IS_ENABLED(CONFIG_SAMSUNG_PRODUCT_SHIP);
+
+		show_regs_auto_comment(regs, auto_comm);
+	}
+#else
 	if (regs)
 		show_regs(regs);
+#endif
 
 	check_panic_on_warn("kernel");
 
@@ -763,7 +788,26 @@ device_initcall(register_warn_debugfs);
  */
 __visible noinstr void __stack_chk_fail(void)
 {
+#if IS_ENABLED(CONFIG_ARM64) && IS_ENABLED(CONFIG_SEC_DEBUG_FAULT_MSG_ADV)
+	long tempx8 = 0, tempx9 = 0;
+	long prev_fp, cur_sp;
+#endif
 	instrumentation_begin();
+
+#if IS_ENABLED(CONFIG_ARM64) && IS_ENABLED(CONFIG_SEC_DEBUG_FAULT_MSG_ADV)
+	__asm__ __volatile__ ("mov %0, x8" : "=r" (tempx8));
+	__asm__ __volatile__ ("mov %0, x9" : "=r" (tempx9));
+
+	pr_auto(ASL1, "__stack_chk_fail: x8[%lx] x9[%lx]\n", tempx8, tempx9);
+
+	prev_fp = (long)__builtin_frame_address(1);
+	cur_sp = (long)current_stack_pointer;
+	if ((prev_fp & ~(THREAD_SIZE - 1)) != (cur_sp & ~(THREAD_SIZE - 1)))
+		pr_auto(ASL1, "   prev fp ^ cur sp = 0x%016lx\n", prev_fp ^ cur_sp);
+
+	pr_auto(ASL1, "stack-protector: Kernel stack is corrupted in: %pB\n",
+		__builtin_return_address(0));
+#endif
 	panic("stack-protector: Kernel stack is corrupted in: %pB",
 		__builtin_return_address(0));
 	instrumentation_end();
@@ -775,7 +819,9 @@ EXPORT_SYMBOL(__stack_chk_fail);
 core_param(panic, panic_timeout, int, 0644);
 core_param(panic_print, panic_print, ulong, 0644);
 core_param(pause_on_oops, pause_on_oops, int, 0644);
+#if !IS_ENABLED(CONFIG_SAMSUNG_PRODUCT_SHIP)
 core_param(panic_on_warn, panic_on_warn, int, 0644);
+#endif
 core_param(crash_kexec_post_notifiers, crash_kexec_post_notifiers, bool, 0644);
 
 static int __init oops_setup(char *s)

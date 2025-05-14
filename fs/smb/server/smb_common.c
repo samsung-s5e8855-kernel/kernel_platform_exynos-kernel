@@ -5,6 +5,9 @@
  */
 
 #include <linux/user_namespace.h>
+#ifdef CONFIG_KDP_CRED
+#include <linux/kdp.h>
+#endif
 
 #include "smb_common.h"
 #include "server.h"
@@ -732,10 +735,10 @@ bool is_asterisk(char *p)
 	return p && p[0] == '*';
 }
 
-int ksmbd_override_fsids(struct ksmbd_work *work)
+int __ksmbd_override_fsids(struct ksmbd_work *work,
+		struct ksmbd_share_config *share)
 {
 	struct ksmbd_session *sess = work->sess;
-	struct ksmbd_share_config *share = work->tcon->share_conf;
 	struct cred *cred;
 	struct group_info *gi;
 	unsigned int uid;
@@ -775,6 +778,11 @@ int ksmbd_override_fsids(struct ksmbd_work *work)
 	return 0;
 }
 
+int ksmbd_override_fsids(struct ksmbd_work *work)
+{
+	return __ksmbd_override_fsids(work, work->tcon->share_conf);
+}
+
 void ksmbd_revert_fsids(struct ksmbd_work *work)
 {
 	const struct cred *cred;
@@ -782,6 +790,10 @@ void ksmbd_revert_fsids(struct ksmbd_work *work)
 	WARN_ON(!work->saved_cred);
 
 	cred = current_cred();
+#ifdef CONFIG_KDP_CRED
+	if (is_kdp_protect_addr((unsigned long)cred))
+		cred = (const struct cred *)(GET_ROCRED_RCU(cred)->reflected_cred);
+#endif
 	revert_creds(work->saved_cred);
 	put_cred(cred);
 	work->saved_cred = NULL;

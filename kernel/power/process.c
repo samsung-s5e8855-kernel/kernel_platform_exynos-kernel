@@ -19,6 +19,8 @@
 #include <linux/kmod.h>
 #include <trace/events/power.h>
 #include <linux/cpuset.h>
+#include <linux/sec_debug_built.h>
+
 
 #include <trace/hooks/power.h>
 
@@ -91,7 +93,7 @@ static int try_to_freeze_tasks(bool user_only)
 		pr_err("Freezing %s aborted after %d.%03d seconds\n", what,
 		       elapsed_msecs / 1000, elapsed_msecs % 1000);
 	} else if (todo) {
-		pr_err("Freezing %s failed after %d.%03d seconds "
+		pr_auto(ASL1, "Freezing %s failed after %d.%03d seconds "
 		       "(%d tasks refusing to freeze, wq_busy=%d):\n", what,
 		       elapsed_msecs / 1000, elapsed_msecs % 1000,
 		       todo - wq_busy, wq_busy);
@@ -103,7 +105,11 @@ static int try_to_freeze_tasks(bool user_only)
 			read_lock(&tasklist_lock);
 			for_each_process_thread(g, p) {
 				if (p != current && freezing(p) && !frozen(p)) {
+#if IS_ENABLED(CONFIG_SEC_DEBUG_AUTO_COMMENT)
+					sched_show_task_auto_comment(p);
+#else
 					sched_show_task(p);
+#endif
 					trace_android_vh_try_to_freeze_todo_unfrozen(p);
 				}
 			}

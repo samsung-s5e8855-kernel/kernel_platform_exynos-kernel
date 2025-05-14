@@ -21,6 +21,9 @@
 #include <linux/sched/isolation.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/task_work.h>
+#include <linux/sec_debug_built.h>
+
+#include <trace/hooks/dtask.h>
 
 #include "internals.h"
 
@@ -115,7 +118,9 @@ static void __synchronize_irq(struct irq_desc *desc)
 	 * We made sure that no hardirq handler is running. Now verify that no
 	 * threaded handlers are active.
 	 */
+	trace_android_vh_sync_irq_wait_start(desc);
 	wait_event(desc->wait_for_threads, !atomic_read(&desc->threads_active));
+	trace_android_vh_sync_irq_wait_finish(desc);
 }
 
 /**
@@ -137,8 +142,11 @@ void synchronize_irq(unsigned int irq)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 
-	if (desc)
+	if (desc) {
+		secdbg_base_built_set_task_in_sync_irq(current, irq, desc);
 		__synchronize_irq(desc);
+		secdbg_base_built_set_task_in_sync_irq(NULL, 0, NULL);
+	}
 }
 EXPORT_SYMBOL(synchronize_irq);
 

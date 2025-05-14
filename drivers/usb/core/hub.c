@@ -39,6 +39,11 @@
 #include "hub.h"
 #include "otg_productlist.h"
 
+#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#undef dev_dbg
+#define dev_dbg dev_err
+#endif
+
 #define USB_VENDOR_GENESYS_LOGIC		0x05e3
 #define USB_VENDOR_SMSC				0x0424
 #define USB_PRODUCT_USB5534B			0x5534

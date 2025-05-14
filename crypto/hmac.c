@@ -22,6 +22,10 @@
 #include <linux/scatterlist.h>
 #include <linux/string.h>
 
+#if defined(CONFIG_CRYPTO_SKC_FIPS)
+#include "fips140_3_services_internal.h"
+#endif  // CONFIG_CRYPTO_SKC_FIPS
+
 struct hmac_ctx {
 	struct crypto_shash *hash;
 };
@@ -51,6 +55,10 @@ static int hmac_setkey(struct crypto_shash *parent,
 	struct crypto_shash *hash = ctx->hash;
 	SHASH_DESC_ON_STACK(shash, hash);
 	unsigned int i;
+
+#if defined(CONFIG_CRYPTO_SKC_FIPS)
+	crypto_hmac_set_key_approve_status(parent, keylen);
+#endif  // CONFIG_CRYPTO_SKC_FIPS
 
 	if (fips_enabled && (keylen < 112 / 8))
 		return -EINVAL;
@@ -122,6 +130,10 @@ static int hmac_final(struct shash_desc *pdesc, u8 *out)
 	char *opad = crypto_shash_ctx_aligned(parent) + ss;
 	struct shash_desc *desc = shash_desc_ctx(pdesc);
 
+#if defined(CONFIG_CRYPTO_SKC_FIPS)
+	calc_final_state_service_indicator(parent);
+#endif  // CONFIG_CRYPTO_SKC_FIPS
+
 	return crypto_shash_final(desc, out) ?:
 	       crypto_shash_import(desc, opad) ?:
 	       crypto_shash_finup(desc, out, ds, out);
@@ -136,6 +148,10 @@ static int hmac_finup(struct shash_desc *pdesc, const u8 *data,
 	int ss = crypto_shash_statesize(parent);
 	char *opad = crypto_shash_ctx_aligned(parent) + ss;
 	struct shash_desc *desc = shash_desc_ctx(pdesc);
+
+#if defined(CONFIG_CRYPTO_SKC_FIPS)
+	calc_final_state_service_indicator(parent);
+#endif  // CONFIG_CRYPTO_SKC_FIPS
 
 	return crypto_shash_finup(desc, data, nbytes, out) ?:
 	       crypto_shash_import(desc, opad) ?:

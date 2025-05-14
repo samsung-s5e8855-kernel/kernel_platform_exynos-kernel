@@ -457,6 +457,8 @@ static inline void kasan_poison(const void *addr, size_t size, u8 value, bool in
 		return;
 	if (WARN_ON(size & KASAN_GRANULE_MASK))
 		return;
+	if (!size)
+		return;
 
 	hw_set_mem_tag_range((void *)addr, size, value, init);
 
@@ -476,6 +478,9 @@ static inline void kasan_unpoison(const void *addr, size_t size, bool init)
 
 	if (WARN_ON((unsigned long)addr & KASAN_GRANULE_MASK))
 		return;
+	if (!size)
+		return;
+
 	size = round_up(size, KASAN_GRANULE_SIZE);
 
 	hw_set_mem_tag_range((void *)addr, size, tag, init);

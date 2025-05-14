@@ -58,6 +58,20 @@ config NVHE_EL2_DEBUG
 
 	  If unsure, say N.
 
+config NVHE_STACK_SHIFT
+	int "Size of the nVHE stack as a power of 2"
+	depends on KVM
+	range 12 13 if ARM64_4K_PAGES
+	default "13" if ARM64_4K_PAGES
+	range 14 15 if ARM64_16K_PAGES
+	default "14" if ARM64_16K_PAGES
+	range 16 17 if ARM64_64K_PAGES
+	default "16" if ARM64_64K_PAGES
+	help
+	  This option specifies the size of the KVM nVHE stack (for both
+	  conventional nVHE and pKVM modes) as a power of 2. This stack
+	  shift must be at least as large as PAGE_SHIFT.
+
 config PROTECTED_NVHE_STACKTRACE
 	bool "Protected KVM hypervisor stacktraces"
 	depends on NVHE_EL2_DEBUG

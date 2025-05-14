@@ -54,8 +54,11 @@
 #include <linux/kvm_para.h>
 #include <linux/delay.h>
 
+#include <linux/sec_debug_built.h>
+
 #include "workqueue_internal.h"
 
+#include <trace/hooks/dtask.h>
 #include <trace/hooks/wqlockup.h>
 /* events/workqueue.h uses default TRACE_INCLUDE_PATH */
 #undef TRACE_INCLUDE_PATH
@@ -328,6 +331,24 @@ struct workqueue_struct {
 	unsigned int		flags ____cacheline_aligned; /* WQ: WQ_* flags */
 	struct pool_workqueue __percpu __rcu **cpu_pwq; /* I: per-cpu pwqs */
 };
+
+#if IS_ENABLED(CONFIG_SEC_DEBUG_MEMTAB)
+SECDBG_DEFINE_MEMBER_TYPE(workqueue_struct_name, workqueue_struct, name);
+SECDBG_DEFINE_MEMBER_TYPE(workqueue_struct_nr_pwqs_to_flush, workqueue_struct, nr_pwqs_to_flush);
+SECDBG_DEFINE_MEMBER_TYPE(workqueue_struct_flush_color, workqueue_struct, flush_color);
+SECDBG_DEFINE_MEMBER_TYPE(workqueue_struct_pwqs, workqueue_struct, pwqs);
+SECDBG_DEFINE_MEMBER_TYPE(pool_workqueue_pwqs_node, pool_workqueue, pwqs_node);
+SECDBG_DEFINE_MEMBER_TYPE(pool_workqueue_flush_color, pool_workqueue, flush_color);
+SECDBG_DEFINE_MEMBER_TYPE(pool_workqueue_nr_in_flight, pool_workqueue, nr_in_flight);
+SECDBG_DEFINE_MEMBER_TYPE(pool_workqueue_pool, pool_workqueue, pool);
+SECDBG_DEFINE_MEMBER_TYPE(worker_pool_busy_hash, worker_pool, busy_hash);
+SECDBG_DEFINE_MEMBER_TYPE(worker_pool_manager, worker_pool, manager);
+SECDBG_DEFINE_MEMBER_TYPE(worker_hentry, worker, hentry);
+SECDBG_DEFINE_MEMBER_TYPE(worker_current_pwq, worker, current_pwq);
+SECDBG_DEFINE_MEMBER_TYPE(worker_task, worker, task);
+SECDBG_DEFINE_MEMBER_TYPE(worker_current_work, worker, current_work);
+SECDBG_DEFINE_MEMBER_TYPE(worker_current_func, worker, current_func);
+#endif
 
 static struct kmem_cache *pwq_cache;
 
@@ -3214,7 +3235,9 @@ void __flush_workqueue(struct workqueue_struct *wq)
 
 	mutex_unlock(&wq->mutex);
 
+	trace_android_vh_flush_wq_wait_start(wq);
 	wait_for_completion(&this_flusher.done);
+	trace_android_vh_flush_wq_wait_finish(wq);
 
 	/*
 	 * Wake-up-and-cascade phase
@@ -3426,7 +3449,9 @@ static bool __flush_work(struct work_struct *work, bool from_cancel)
 	lock_map_release(&work->lockdep_map);
 
 	if (start_flush_work(work, &barr, from_cancel)) {
+		trace_android_vh_flush_work_wait_start(work);
 		wait_for_completion(&barr.done);
+		trace_android_vh_flush_work_wait_finish(work);
 		destroy_work_on_stack(&barr.work);
 		return true;
 	} else {
@@ -6478,7 +6503,7 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 				pool->cpu_stall = true;
 				cpu_pool_stall = true;
 			}
-			pr_emerg("BUG: workqueue lockup - pool");
+			pr_auto(ASL9, "BUG: workqueue lockup - pool");
 			pr_cont_pool_info(pool);
 			pr_cont(" stuck for %us!\n",
 				jiffies_to_msecs(now - pool_ts) / 1000);

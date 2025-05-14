@@ -1240,6 +1240,9 @@ static blk_status_t sd_setup_read_write_cmnd(struct scsi_cmnd *cmd)
 			goto fail;
 	}
 
+	if (rq->cmd_flags & REQ_RELIABLE)
+		rq->cmd_flags |= REQ_FUA;
+
 	fua = rq->cmd_flags & REQ_FUA ? 0x8 : 0;
 	dix = scsi_prot_sg_count(cmd);
 	dif = scsi_host_dif_capable(cmd->device->host, sdkp->protection_type);
@@ -3445,6 +3448,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device *sdp = sdkp->device;
 	struct request_queue *q = sdkp->disk->queue;
+	const struct scsi_host_template *sht = sdp->host->hostt;
 	sector_t old_capacity = sdkp->capacity;
 	unsigned char *buffer;
 	unsigned int dev_max, rw_max;
@@ -3542,6 +3546,10 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	 * host limit.
 	 */
 	rw_max = min_not_zero(rw_max, sdp->host->opt_sectors);
+
+	/* Set rw_max using hw_max when device is ufs */
+	if (!strncmp(sht->name, "ufshcd", 6))
+		rw_max = queue_max_hw_sectors(q);
 
 	/* Do not exceed controller limit */
 	rw_max = min(rw_max, queue_max_hw_sectors(q));

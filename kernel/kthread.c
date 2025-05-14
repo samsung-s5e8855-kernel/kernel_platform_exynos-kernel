@@ -463,14 +463,16 @@ struct task_struct *__kthread_create_on_node(int (*threadfn)(void *data),
 		 * kernel thread) calls complete(), leave the cleanup of this
 		 * structure to that thread.
 		 */
-		if (xchg(&create->done, NULL))
+		if (xchg(&create->done, NULL)) {
 			return ERR_PTR(-EINTR);
+		}
 		/*
 		 * kthreadd (or new kernel thread) will call complete()
 		 * shortly.
 		 */
 		wait_for_completion(&done);
 	}
+
 	task = create->result;
 free_create:
 	kfree(create);

@@ -293,7 +293,7 @@ static void noinstr __panic_unhandled(struct pt_regs *regs, const char *vector,
 
 	console_verbose();
 
-	pr_crit("Unhandled %s exception on CPU%d, ESR 0x%016lx -- %s\n",
+	pr_auto(ASL1, "Unhandled %s exception on CPU%d, ESR 0x%016lx -- %s\n",
 		vector, smp_processor_id(), esr,
 		esr_get_class_string(esr));
 

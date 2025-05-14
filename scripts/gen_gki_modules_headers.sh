@@ -48,6 +48,10 @@ generate_header() {
 		rm -f -- "${header_file}"
 	fi
 
+	if [ -f "${symbol_file}" ]; then
+		chmod u+w "${symbol_file}"
+	fi
+
 	# If symbol_file exist preprocess it and find maximum name length
 	if [  -s "${symbol_file}" ]; then
 		# Remove any trailing CR, leading / trailing whitespace,

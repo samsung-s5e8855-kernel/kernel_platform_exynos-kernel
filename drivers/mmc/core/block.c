@@ -46,6 +46,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
+#include <trace/hooks/mmc.h>
 
 #include <linux/uaccess.h>
 
@@ -1943,7 +1944,8 @@ static void mmc_blk_mq_rw_recovery(struct mmc_queue *mq, struct request *req)
 	}
 
 	if (rq_data_dir(req) == READ && brq->data.blocks >
-			queue_physical_block_size(mq->queue) >> 9) {
+			queue_physical_block_size(mq->queue) >> 9 &&
+			!mmc_card_sd(card)) {
 		/* Read one (native) sector at a time */
 		mmc_blk_read_single(mq, req);
 		return;
@@ -2565,6 +2567,10 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
 		cap_str, md->read_only ? " (ro)" : "");
 
+	ST_LOG("%s: %s %s %s %s\n",
+		md->disk->disk_name, mmc_card_id(card), mmc_card_name(card),
+		cap_str, md->read_only ? "(ro)" : "");
+
 	/* used in ->open, must be set before add_disk: */
 	if (area_type == MMC_BLK_DATA_AREA_MAIN)
 		dev_set_drvdata(&card->dev, md);
@@ -3029,6 +3035,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 		ret = PTR_ERR(md);
 		goto out_free;
 	}
+	trace_android_vh_mmc_update_mmc_queue(card, &md->queue);
 
 	ret = mmc_blk_alloc_parts(card, md);
 	if (ret)

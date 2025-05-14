@@ -1547,6 +1547,10 @@ vmlinuxclean:
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/link-vmlinux.sh clean
 	$(Q)$(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) clean)
 
+mxsrc:= $(srctree)/../../kernel/exynos/device/mx/mx8855
+legoclean:
+	$(Q)$(CONFIG_SHELL) $(mxsrc)/scripts/lego/kclean.sh $(mxsrc)/.legofile
+
 clean: archclean vmlinuxclean resolve_btfids_clean
 
 # mrproper - Delete all generated files, including .config

@@ -153,8 +153,10 @@ static void z_erofs_onlinepage_endio(struct page *page, int err)
 	if (!(v & ~Z_EROFS_PAGE_EIO)) {
 		set_page_private(page, 0);
 		ClearPagePrivate(page);
-		if (!(v & Z_EROFS_PAGE_EIO))
+		if (!(v & Z_EROFS_PAGE_EIO)) {
+			SetPageMappedToDisk(page);
 			SetPageUptodate(page);
+		}
 		unlock_page(page);
 	}
 }
@@ -974,6 +976,10 @@ static int z_erofs_do_read_page(struct z_erofs_decompress_frontend *fe,
 	int err = 0;
 
 	z_erofs_onlinepage_init(page);
+
+	if (cleancache_get_page(page) == 0)
+		goto out;
+
 	split = 0;
 	end = PAGE_SIZE;
 repeat:
